@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蘭亭雅集：名士風流 (卷軸優化版)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* --- 全局設定 --- */
+        :root {
+            --ink-black: #1a1a1a;
+            --paper-bg: #f0efe9;
+            --paper-texture: #e6e2d8;
+            --accent-red: #8f2a2a;
+            --highlight-gold: #c5a059; /* 卷軸金 */
+            --text-gray: #4a4a4a;
+            --dialog-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body {
+            background-color: #111;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Noto Serif TC', serif;
+            color: var(--ink-black);
+            /* 防止背景在大螢幕上滑動，專注於遊戲容器 */
+            overflow: hidden; 
+        }
+
+        /* --- 自定義卷軸樣式 (核心修改) --- */
+        /* 針對 Webkit 瀏覽器 (Chrome, Safari, Edge) */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #e0ddd3; /* 紙張色 */
+            border-left: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--highlight-gold); /* 卷軸軸心顏色 */
+            border: 1px solid #a88543;
+            border-radius: 5px;
+            background-image: linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent); 
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-red); /* 懸停變色 */
+        }
+        
+        /* Firefox 卷軸樣式 */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--highlight-gold) #e0ddd3;
+        }
+
+        /* --- 遊戲容器 (16:9) --- */
+        #game-container {
+            width: 100%;
+            max-width: 1280px;
+            aspect-ratio: 16 / 9;
+            max-height: 100vh; /* 確保不超過視窗 */
+            background-color: var(--paper-bg);
+            display: grid;
+            grid-template-rows: 55% 45%; /* 視覺區佔 55% */
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border-radius: 4px;
+        }
+
+        /* --- 上半部：視覺區 --- */
+        #visual-area {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: #333;
+            overflow: hidden;
+            border-bottom: 4px solid var(--ink-black);
+        }
+
+        /* 圖片容器 */
+        #scene-image-container {
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        #scene-image-container img {
+             width: 100%;
+             height: 100%;
+             object-fit: cover;
+             opacity: 0; /* 預設隱藏，用於淡入效果 */
+             transition: opacity 1s ease-in-out;
+             filter: contrast(1.1) sepia(0.15); /* 微調濾鏡增強古風感 */
+        }
+
+        #scene-image-container img.loaded {
+            opacity: 1;
+        }
+
+        #scene-title {
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 48px;
+            color: var(--ink-black);
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.8);
+            z-index: 10;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 25px;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid #999;
+        }
+
+        /* --- 下半部：互動區 (雙欄設計) --- */
+        #interaction-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+            overflow: hidden; /* 防止父層被撐開 */
+            background-image: radial-gradient(var(--paper-texture) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+
+        /* 左欄：環境敘事 */
+        #narrative-column {
+            padding: 30px 40px;
+            border-right: 1px solid #ccc;
+            overflow-y: auto; /* 加上捲軸 */
+            font-size: 18px;
+            line-height: 1.8;
+            color: #222;
+            background: rgba(240, 239, 233, 0.7);
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .narrative-text p {
+            margin-bottom: 20px;
+            text-indent: 2em;
+        }
+        
+        .narrative-label {
+            font-size: 14px;
+            color: var(--accent-red);
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: block;
+            letter-spacing: 2px;
+            border-bottom: 1px dashed #aaa;
+            padding-bottom: 5px;
+            position: sticky; /* 標題釘選 */
+            top: 0;
+            background: inherit;
+        }
+
+        /* 右欄：對話與操作 */
+        #dialogue-column {
+            padding: 30px;
+            overflow-y: auto; /* 加上捲軸，避免選項被裁切 */
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* 改用 gap 代替 justify-content: space-between 以適應內容長度 */
+            background: rgba(255,255,255,0.5);
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 對話框 */
+        #dialogue-box {
+            background: var(--dialog-bg);
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            min-height: 120px;
+            flex-shrink: 0; /* 防止對話框被壓縮 */
+            position: relative;
+        }
+
+        #dialogue-box::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px solid rgba(0,0,0,0.05);
+            pointer-events: none;
+        }
+
+        .speaker-name {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 26px;
+            color: var(--accent-red);
+            margin-bottom: 10px;
+            display: block;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .dialogue-content {
+            font-size: 19px;
+            color: var(--ink-black);
+            line-height: 1.6;
+            font-weight: 500;
+        }
+
+        /* 選項區 */
+        #choices-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-bottom: 20px; /* 底部留白方便滑動 */
+        }
+
+        .choice-btn {
+            background: #fff;
+            border: 1px solid #bbb;
+            border-left: 6px solid var(--ink-black);
+            padding: 15px 20px;
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 16px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .choice-btn:hover {
+            background: var(--ink-black);
+            color: #fff;
+            border-left-color: var(--accent-red);
+            transform: translateX(5px);
+        }
+        
+        .choice-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #f9f9f9;
+            border-left-color: #ccc;
+        }
+
+        /* 狀態列 */
+        #stats-overlay {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            gap: 20px;
+            font-size: 15px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 20;
+            border: 1px solid #ccc;
+        }
+
+        .stat-item i { color: var(--accent-red); margin-right: 6px; }
+
+        /* 動畫 */
+        .fade-in { animation: fadeIn 0.8s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* RWD 針對手機和平板的優化 */
+        @media (max-width: 900px) {
+             #game-container {
+                aspect-ratio: auto;
+                height: 100%;
+                max-height: none;
+                grid-template-rows: 40vh 1fr; /* 視覺區固定高度，下方自適應 */
+                overflow-y: auto; /* 整個容器可捲動 */
+            }
+
+            body {
+                height: auto;
+                overflow: auto; /* 允許 body 捲動 */
+                display: block; /* 取消 flex center 讓內容自然流動 */
+            }
+
+            #interaction-area {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow: visible;
+            }
+
+            #narrative-column, #dialogue-column {
+                height: auto;
+                max-height: 400px; /* 給予最大高度限制並允許捲動 */
+                overflow-y: auto;
+                border-right: none;
+                border-bottom: 1px solid #ccc;
+            }
+
+            #scene-title {
+                font-size: 32px;
+                padding: 5px 15px;
+                top: 10px;
+                left: 10px;
+            }
+            
+            #stats-overlay {
+                top: auto;
+                bottom: 10px;
+                right: 10px;
+                padding: 5px 15px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        
+        <!-- 頂部狀態 -->
+        <div id="stats-overlay">
+            <div class="stat-item"><i class="fa-solid fa-pen-nib"></i> 文采: <span id="stat-art">0</span></div>
+            <div class="stat-item"><i class="fa-solid fa-scroll"></i> 經世: <span id="stat-pol">0</span></div>
+            <div class="stat-item"><i class="fa-solid fa-yin-yang"></i> 玄理: <span id="stat-phi">0</span></div>
+        </div>
+
+        <!-- 視覺區 -->
+        <div id="visual-area">
+            <div id="scene-title">蘭亭集序</div>
+            <div id="scene-image-container">
+                <img id="current-scene-img" src="" alt="Scene Image">
+            </div>
+        </div>
+
+        <!-- 互動區 -->
+        <div id="interaction-area">
+            <!-- 左欄：環境敘事 -->
+            <div id="narrative-column">
+                <span class="narrative-label">環境與心境</span>
+                <div id="narrative-text" class="narrative-text">
+                    載入中...
+                </div>
+            </div>
+
+            <!-- 右欄：對話與操作 -->
+            <div id="dialogue-column">
+                <div id="dialogue-box">
+                    <span id="speaker-name" class="speaker-name">載入中</span>
+                    <div id="dialogue-text" class="dialogue-content">
+                        遊戲載入中...
+                    </div>
+                </div>
+
+                <div id="choices-container">
+                    <!-- 按鈕生成區 -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 遊戲資料庫 (全圖片已配置) ---
+        const scenes = {
+            start: {
+                title: "暮春之初",
+                imgUrl: "https://image.pollinations.ai/prompt/Chinese%20traditional%20ink%20painting%20lush%20green%20mountains%20bamboo%20forest%20misty%20spring%20path?width=1280&height=720&nologo=true",
+                narrative: "<p>這一年是永和九年，癸丑歲。暮春三月的風已經褪去了冬日的寒意，變得溫潤而舒爽。</p><p>你應邀來到了會稽山陰。抬頭望去，四周崇山峻嶺高聳入雲，將塵世的喧囂隔絕在外。山間茂密的樹林與修長的竹子在微風中搖曳，發出沙沙的聲響。一條清澈的溪流從山間奔湧而下，水聲激越，映照著兩岸的景色。</p><p>這樣的景致，讓人忍不住想要停下腳步，好好欣賞一番。</p>",
+                speaker: "僕人",
+                dialogue: "「公子，蘭亭就在前方了。今日這場脩禊盛會，聽說連右軍將軍（王羲之）都親自到場，還有謝安、孫綽這些大名士，真是『群賢畢至』啊。」",
+                choices: [
+                    { text: "整理衣冠，這可是展露頭角的好機會。(文采 +1)", next: "arrival", effects: { art: 1 } },
+                    { text: "深吸一口氣，這山水真讓人心曠神怡。(玄理 +1)", next: "arrival", effects: { phi: 1 } }
+                ]
+            },
+            arrival: {
+                title: "列坐其次",
+                imgUrl: "https://image.pollinations.ai/prompt/Ancient%20Chinese%20scholars%20sitting%20by%20winding%20stream%20in%20nature%20ink%20painting%20style%20elegant?width=1280&height=720&nologo=true",
+                narrative: "<p>亭中並無案几，大家依循著地形，坐在蜿蜒曲折的溪水兩旁。這便是傳說中的「流觴曲水」。</p><p>現場沒有鐘鼓樂隊的喧鬧演奏，只有鳥鳴與水聲。侍者將輕巧的羽觴（酒杯）放入溪水中，任其隨波逐流。</p><p>你找了個位置坐下，只覺周身清涼，俗慮全消。</p>",
+                speaker: "謝安",
+                dialogue: "謝安手持麈尾，笑著對眾人說：「諸位，今日我們不講究那些繁雜的排場。這裡雖然沒有絲竹管弦助興，但有一杯薄酒、一句好詩，難道不足以讓我們暢快地抒發內心深處的情感嗎？」",
+                choices: [
+                    { text: "點頭稱是，這種清雅正合我意。", next: "qushui_turn", effects: { phi: 1 } },
+                    { text: "心中暗想：若無音樂，似乎少了點熱鬧。", next: "qushui_turn", effects: { pol: 1 } }
+                ]
+            },
+            qushui_turn: {
+                title: "遊目騁懷",
+                imgUrl: "https://image.pollinations.ai/prompt/Close%20up%20of%20a%20small%20wooden%20wine%20cup%20floating%20on%20river%20water%20ancient%20chinese%20art%20ripples?width=1280&height=720&nologo=true",
+                narrative: "<p>輪到你了。酒杯在湍急的溪流中打了個轉，緩緩停在你的面前。</p><p>你抬頭仰望，天空湛藍如洗，萬里無雲；低頭俯視，周圍草木繁盛，生機勃勃。面對如此浩瀚的宇宙與繁盛的萬物，你感到心胸前所未有的開闊。</p><p>這便是『仰觀宇宙之大，俯察品類之盛』的真諦吧。</p>",
+                speaker: "孫綽",
+                dialogue: "孫綽在一旁起鬨：「這位小友，酒杯停了！今日天朗氣清，惠風和暢，何不以此情此景，賦詩一首？讓我們看看你的視聽之娛，究竟有多快樂！」",
+                choices: [
+                    { text: "吟詠宇宙之大與萬物之盛。(需文采 > 0)", next: "poem_success", check: { stat: 'art', val: 1 }, fallback: "poem_fail" },
+                    { text: "感嘆眼前快樂真實可信。(信可樂也)", next: "simple_joy", effects: { phi: 1 } }
+                ]
+            },
+            poem_success: {
+                title: "信可樂也",
+                imgUrl: "https://image.pollinations.ai/prompt/Ancient%20Chinese%20scholar%20standing%20and%20reciting%20poem%20happily%20confident%20nature%20background%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>你站起身來，將眼前的天光雲影與內心的舒暢化作詩句。你的聲音在山谷間迴盪，將那份「遊目騁懷」的極致快樂表達得淋漓盡致。</p><p>眾人聽罷，皆露出了讚賞的神色。</p>",
+                speaker: "王羲之",
+                dialogue: "王羲之撫掌大笑：「好！好一個『足以極視聽之娛』！這份快樂是真實的，實在是令人陶醉啊（信可樂也）。來，滿飲此杯！」",
+                choices: [
+                    { text: "飲盡杯中酒，坐下觀察眾人。", next: "observation", effects: { art: 2 } }
+                ]
+            },
+            poem_fail: {
+                title: "一時語塞",
+                imgUrl: "https://image.pollinations.ai/prompt/Ancient%20Chinese%20scholar%20looking%20embarrassed%20shy%20holding%20wine%20cup%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>你試圖將眼前的景色化為語言，但面對這麼多名士，你一時緊張，只說了幾句大白話。雖然大家善意地笑了笑，但你覺得有些遺憾。</p>",
+                speaker: "孫綽",
+                dialogue: "「哈哈，看來小友是被這美景醉倒了，話都說不出來了。罷了，罰酒三杯！」",
+                choices: [
+                    { text: "慚愧地喝下罰酒。", next: "observation", effects: { pol: 1 } }
+                ]
+            },
+            simple_joy: {
+                title: "自得其樂",
+                imgUrl: "https://image.pollinations.ai/prompt/Ancient%20Chinese%20scholar%20drinking%20wine%20peaceful%20smile%20river%20background%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>你沒有作長篇大論的詩句，只是簡單地表達了對這良辰美景的喜愛。這份純粹的快樂反而感染了周圍的人。</p>",
+                speaker: "支遁",
+                dialogue: "支遁法師微微點頭：「施主心無掛礙，這份『快然自足』的心境，比華麗的辭藻更難得。」",
+                choices: [
+                    { text: "微笑致意。", next: "observation", effects: { phi: 2 } }
+                ]
+            },
+            observation: {
+                title: "俯仰一世",
+                imgUrl: "https://image.pollinations.ai/prompt/Group%20of%20ancient%20Chinese%20scholars%20talking%20relaxing%20bamboo%20forest%20panorama%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>酒過三巡，你觀察著周圍的人。人與人相處，一輩子轉眼就過去了。</p><p>你看見有人拉著好友在角落低聲細語，那是將心事傾吐於密室之內；又看見有人解開衣襟，在大石上高聲長嘯，那是寄情於山水，放浪於形體之外。</p>",
+                speaker: "你（內心獨白）",
+                dialogue: "（雖然大家的性格靜躁不同，取捨各異，但當他們沉浸在當下的快樂中時，那份滿足感是一樣的。在那一刻，大家都忘了自己終將老去……）",
+                choices: [
+                    { text: "但這份快樂能維持多久呢？", next: "shift_sadness", effects: { phi: 1 } },
+                    { text: "不管了，今朝有酒今朝醉！", next: "drunk_end", effects: { art: -1 } }
+                ]
+            },
+            shift_sadness: {
+                title: "情隨事遷",
+                imgUrl: "https://image.pollinations.ai/prompt/Sunset%20over%20ancient%20Chinese%20mountains%20melancholic%20atmosphere%20ink%20painting%20darker?width=1280&height=720&nologo=true",
+                narrative: "<p>太陽漸漸西斜，歡樂的時光似乎到了尾聲。一陣涼風吹過，王羲之放下了酒杯，臉上的笑容逐漸凝固，轉為一種深深的憂慮。</p><p>剛才還讓我們感到欣喜的事物，一低頭一抬頭之間，就已經變成了陳舊的遺跡。這份情感的變化，怎能不讓人感慨？</p>",
+                speaker: "王羲之",
+                dialogue: "王羲之嘆了口氣，聲音低沉：「諸位，我們今日如此快樂，但這快樂留得住嗎？這一切轉瞬即逝，不僅如此，我們的壽命長短聽憑造化，終究都要走向盡頭（終期於盡）。」",
+                choices: [
+                    { text: "靜靜聆聽他的感嘆。", next: "big_question", effects: {} }
+                ]
+            },
+            big_question: {
+                title: "死生亦大",
+                imgUrl: "https://image.pollinations.ai/prompt/Flowing%20river%20water%20close%20up%20sad%20emotional%20abstract%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>溪水依舊在流，但聽在耳裡卻多了幾分淒涼。王羲之的話語像石頭一樣壓在每個人心上。</p>",
+                speaker: "王羲之",
+                dialogue: "「古人說：『死生亦大矣。』這難道不令人感到悲痛嗎？（豈不痛哉！）每當我看到古人對生命無常的感嘆，都像拿著契約一樣吻合。我雖想排遣這份悲傷，卻始終無法釋懷。」",
+                choices: [
+                    { text: "這太悲觀了，難道生命沒有意義嗎？", next: "confrontation", effects: { phi: 1 } }
+                ]
+            },
+            confrontation: {
+                title: "虛誕與妄作",
+                imgUrl: "https://image.pollinations.ai/prompt/Two%20ancient%20Chinese%20scholars%20debating%20face%20to%20face%20intense%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>你想到了當時流行的莊子學說，許多人主張「生與死是一樣的」、「長壽與夭折沒有差別」，以此來麻痺自己。</p><p>你鼓起勇氣，向王羲之提出了這個疑問。</p>",
+                speaker: "王羲之",
+                dialogue: "王羲之猛地搖頭，目光變得銳利：「我不認同！那些說『生與死一樣（一死生）』的都是虛假荒誕的話；說『長壽與夭折相等（齊彭殤）』的更是胡亂編造！活著就是活著，這份情感是真實的，怎能說是虛幻？」",
+                choices: [
+                    { text: "既然無法逃避死亡，我們該留下什麼？", next: "conclusion", effects: { pol: 1, art: 1 } }
+                ]
+            },
+            conclusion: {
+                title: "後之視今",
+                imgUrl: "https://image.pollinations.ai/prompt/Wang%20Xizhi%20writing%20calligraphy%20brush%20paper%20close%20up%20masterpiece?width=1280&height=720&nologo=true",
+                narrative: "<p>王羲之重新拿起筆，眼神不再迷惘。他決定將今日的聚會、眾人的詩作，以及這份對生命的感悟，全部記錄下來。</p>",
+                speaker: "王羲之",
+                dialogue: "「後人看我們，就像我們看古人一樣。雖然時代會變，世事會變，但人們觸發感觸的原因是一樣的。我要寫下這篇序，讓後世的讀者（後之覽者），也能對我們的文章與心境產生共鳴（有感於斯文）。」",
+                choices: [
+                    { text: "在旁研墨，見證千古名篇的誕生。(真結局)", next: "true_end", effects: { art: 2, phi: 2 } },
+                    { text: "默默退出，心中若有所思。(普通結局)", next: "normal_end", effects: {} }
+                ]
+            },
+            drunk_end: {
+                title: "結局：醉生夢死",
+                imgUrl: "https://image.pollinations.ai/prompt/Ancient%20Chinese%20scholar%20drunk%20sleeping%20on%20rock%20moonlight%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>你選擇了麻痺自己，不想去思考那些沉重的問題。你在酒精中度過了一個愉快的夜晚，但第二天醒來，除了頭痛，什麼也沒留下。</p>",
+                speaker: "結局",
+                dialogue: "你錯過了領悟生命真諦的機會，成為了魏晉風流中一個模糊的背景。",
+                choices: [
+                    { text: "重新來過", next: "start", effects: { reset: true } }
+                ]
+            },
+            normal_end: {
+                title: "結局：魏晉過客",
+                imgUrl: "https://image.pollinations.ai/prompt/Back%20view%20of%20ancient%20Chinese%20scholar%20walking%20away%20mountain%20path%20lonely%20ink%20painting?width=1280&height=720&nologo=true",
+                narrative: "<p>你參與了這場盛會，見證了歷史。你理解了王羲之的悲痛，但你選擇了做一個旁觀者。這段經歷成為了你人生中一段美好的回憶。</p>",
+                speaker: "結局",
+                dialogue: "你是一個合格的見證者，但並未在歷史上留下濃墨重彩的一筆。",
+                choices: [
+                    { text: "重新來過", next: "start", effects: { reset: true } }
+                ]
+            },
+            true_end: {
+                title: "結局：感於斯文",
+                imgUrl: "https://image.pollinations.ai/prompt/Lantingji%20Xu%20calligraphy%20scroll%20glowing%20holy%20light%20artistic?width=1280&height=720&nologo=true",
+                narrative: "<p>你見證了《蘭亭集序》的誕生。那一刻，你明白了：文字與情感可以超越時間的限制，戰勝死亡的虛無。這份領悟，將伴隨你一生。</p>",
+                speaker: "結局",
+                dialogue: "恭喜！你不僅讀懂了文章，更讀懂了生命。這份「文采」與「玄理」的結合，讓你達成了完美結局。",
+                choices: [
+                    { text: "再次品味", next: "start", effects: { reset: true } }
+                ]
+            }
+        };
+
+        // --- 遊戲邏輯 ---
+        let state = {
+            art: 0,
+            pol: 0,
+            phi: 0
+        };
+
+        const narrativeTextEl = document.getElementById('narrative-text');
+        const dialogueTextEl = document.getElementById('dialogue-text');
+        const speakerNameEl = document.getElementById('speaker-name');
+        const choicesEl = document.getElementById('choices-container');
+        const sceneTitleEl = document.getElementById('scene-title');
+        const sceneImgEl = document.getElementById('current-scene-img');
+        
+        const statArt = document.getElementById('stat-art');
+        const statPol = document.getElementById('stat-pol');
+        const statPhi = document.getElementById('stat-phi');
+
+        function updateStatsDisplay() {
+            statArt.innerText = state.art;
+            statPol.innerText = state.pol;
+            statPhi.innerText = state.phi;
+        }
+
+        function renderScene(sceneKey) {
+            const scene = scenes[sceneKey];
+            
+            // 1. 更新視覺區 (圖片淡入效果)
+            sceneTitleEl.innerText = scene.title;
+            
+            // 重置圖片加載狀態
+            sceneImgEl.classList.remove('loaded');
+            // 設定新圖片
+            sceneImgEl.src = scene.imgUrl;
+            
+            // 當圖片載入完成後淡入
+            sceneImgEl.onload = () => {
+                sceneImgEl.classList.add('loaded');
+            };
+            
+            // 2. 更新左欄：環境敘事 (淡入動畫)
+            narrativeTextEl.innerHTML = scene.narrative;
+            narrativeTextEl.classList.remove('fade-in');
+            void narrativeTextEl.offsetWidth; // trigger reflow
+            narrativeTextEl.classList.add('fade-in');
+
+            // 確保捲動回頂部
+            document.getElementById('narrative-column').scrollTop = 0;
+            document.getElementById('dialogue-column').scrollTop = 0;
+
+            // 3. 更新右欄：對話
+            speakerNameEl.innerText = scene.speaker;
+            dialogueTextEl.innerHTML = scene.dialogue;
+
+            // 4. 生成選項
+            choicesEl.innerHTML = '';
+            scene.choices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                
+                let content = choice.text;
+                let locked = false;
+
+                // 檢查條件
+                if (choice.check) {
+                    if (state[choice.check.stat] < choice.check.val) {
+                        if (choice.fallback) {
+                            content += ` <span style="color:#888; font-size:12px;">(能力不足)</span>`;
+                            btn.onclick = () => {
+                                handleEffects(choice.effects);
+                                renderScene(choice.fallback);
+                            };
+                        } else {
+                            content += ` <span style="color:red; font-size:12px;">(需${getStatName(choice.check.stat)} ${choice.check.val})</span>`;
+                            locked = true;
+                            btn.disabled = true;
+                        }
+                    } else {
+                         btn.onclick = () => {
+                            handleEffects(choice.effects);
+                            renderScene(choice.next);
+                        };
+                    }
+                } else {
+                    btn.onclick = () => {
+                        handleEffects(choice.effects);
+                        renderScene(choice.next);
+                    };
+                }
+
+                btn.innerHTML = content;
+                choicesEl.appendChild(btn);
+            });
+        }
+
+        function getStatName(key) {
+            if(key === 'art') return '文采';
+            if(key === 'pol') return '經世';
+            if(key === 'phi') return '玄理';
+            return '';
+        }
+
+        function handleEffects(effects) {
+            if (effects && effects.reset) {
+                state = { art: 0, pol: 0, phi: 0 };
+            } else if (effects) {
+                if (effects.art) state.art += effects.art;
+                if (effects.pol) state.pol += effects.pol;
+                if (effects.phi) state.phi += effects.phi;
+            }
+            updateStatsDisplay();
+        }
+
+        // 初始化
+        renderScene('start');
+
+    </script>
+</body>
+</html>
